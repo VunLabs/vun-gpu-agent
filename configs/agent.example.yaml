@@ -1,0 +1,3 @@
+# Copy this file to agent.yaml and adjust the values for your environment.
+listen_address: ":8080"
+log_level: "info"

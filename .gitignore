@@ -1,0 +1,37 @@
+# Binaries and build output
+/bin/
+/build/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+
+# Go tooling and coverage
+coverage.out
+coverage.html
+*.prof
+
+# Local configuration and runtime data
+/configs/agent.yaml
+/data/
+/tmp/
+*.log
+
+# Environment files and secrets
+.env
+.env.*
+!.env.example
+
+# IDE and editor settings
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Operating system metadata
+.DS_Store
+Thumbs.db
