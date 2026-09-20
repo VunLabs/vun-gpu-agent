@@ -6,9 +6,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 
+	"github.com/SunilkumarT56/vun-gpu-agent/internal/config"
+	"github.com/SunilkumarT56/vun-gpu-agent/internal/enrollment"
 	"github.com/SunilkumarT56/vun-gpu-agent/internal/gpu"
+	"github.com/SunilkumarT56/vun-gpu-agent/internal/state"
 	"github.com/SunilkumarT56/vun-gpu-agent/internal/version"
 )
 
@@ -46,17 +50,19 @@ func RunREPL(ctx context.Context, in io.Reader, out io.Writer) error {
 		name := strings.ToLower(parts[0])
 		jsonOutput := false
 		mockOutput := false
-		for _, part := range parts[1:] {
-			switch part {
-			case "--json":
-				jsonOutput = true
-			case "--mock":
-				mockOutput = true
-			default:
-				fmt.Fprintf(out, "usage: %s [--json] [--mock]\n", name)
-				jsonOutput = false
-				mockOutput = false
-				parts = nil
+		if name == "inventory" || name == "discover" {
+			for _, part := range parts[1:] {
+				switch part {
+				case "--json":
+					jsonOutput = true
+				case "--mock":
+					mockOutput = true
+				default:
+					fmt.Fprintf(out, "usage: %s [--json] [--mock]\n", name)
+					jsonOutput = false
+					mockOutput = false
+					parts = nil
+				}
 			}
 		}
 
@@ -65,6 +71,10 @@ func RunREPL(ctx context.Context, in io.Reader, out io.Writer) error {
 			printHelp(out)
 		case "version":
 			fmt.Fprintf(out, "vun version %s\n", version.Value)
+		case "enroll":
+			if err := Enroll(ctx, out, parts[1:]); err != nil {
+				fmt.Fprintf(out, "error: %v\n", err)
+			}
 		case "inventory", "discover":
 			if parts == nil {
 				continue
@@ -117,11 +127,57 @@ func printHelp(out io.Writer) {
 	fmt.Fprintln(out, "Commands:")
 	fmt.Fprintln(out, "  help       Show this help message")
 	fmt.Fprintln(out, "  version    Show the agent version")
+	fmt.Fprintln(out, "  enroll     Enroll this host with the VUN API")
 	fmt.Fprintln(out, "  inventory  Discover and print host inventory")
 	fmt.Fprintln(out, "  discover   Alias for inventory")
 	fmt.Fprintln(out, "             Add --json for machine-readable output")
 	fmt.Fprintln(out, "             Add --mock to use simulated GPUs")
 	fmt.Fprintln(out, "  exit       Exit the agent")
+}
+
+// Enroll discovers the host and registers it with the configured VUN API.
+func Enroll(ctx context.Context, out io.Writer, args []string) error {
+	token := os.Getenv("VUN_ENROLLMENT_TOKEN")
+	configPath := "configs/agent.yaml"
+	for i := 0; i < len(args); i++ {
+		switch args[i] {
+		case "--token":
+			if i+1 >= len(args) {
+				return fmt.Errorf("usage: enroll [--token TOKEN] [--config PATH]")
+			}
+			token = args[i+1]
+			i++
+		case "--config":
+			if i+1 >= len(args) {
+				return fmt.Errorf("usage: enroll [--token TOKEN] [--config PATH]")
+			}
+			configPath = args[i+1]
+			i++
+		default:
+			return fmt.Errorf("unknown enroll option %q", args[i])
+		}
+	}
+	if strings.TrimSpace(token) == "" {
+		return fmt.Errorf("enrollment token is required; set VUN_ENROLLMENT_TOKEN or use --token")
+	}
+	cfg, err := config.Load(configPath)
+	if err != nil {
+		return err
+	}
+	inventory, err := gpu.DiscoverHostInventory(ctx)
+	if err != nil {
+		return fmt.Errorf("discover host inventory: %w", err)
+	}
+	result, err := (enrollment.Client{BaseURL: cfg.APIURL}).Enroll(ctx, token, version.Value, inventory)
+	if err != nil {
+		return err
+	}
+	if err := state.SaveEnrollment(state.Enrollment{HostID: result.HostID, AgentCredential: result.AgentCredential}); err != nil {
+		return err
+	}
+	fmt.Fprintf(out, "Enrollment successful\n  Host ID: %s\n", result.HostID)
+	fmt.Fprintln(out, "  Agent credential saved locally.")
+	return nil
 }
 
 // PrintInventoryJSON writes an indented JSON host inventory report.

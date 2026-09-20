@@ -32,6 +32,11 @@ func main() {
 	switch os.Args[1] {
 	case "start":
 		start(os.Args[2:])
+	case "enroll":
+		if err := cli.Enroll(context.Background(), os.Stdout, os.Args[2:]); err != nil {
+			fmt.Fprintf(os.Stderr, "vun: enrollment failed: %v\n", err)
+			os.Exit(1)
+		}
 	case "inventory", "discover":
 		inventory(os.Args[2:])
 	default:
@@ -105,6 +110,7 @@ func printHelp() {
 	fmt.Println("  start      Start the agent and print host inventory")
 	fmt.Println("  inventory  Discover and print host inventory")
 	fmt.Println("             Use --mock for simulated GPUs or --json for JSON output")
+	fmt.Println("  enroll     Enroll this host with the VUN API")
 	fmt.Println("  version    Show the VUN version")
 	fmt.Println("  help       Show this help message")
 	fmt.Println()

@@ -92,3 +92,25 @@ The mock inventory returns two simulated NVIDIA RTX 4090 devices. Normal
 The agent discovers host metadata (hostname, OS, architecture, CPU, memory,
 and storage) and NVIDIA GPUs with `nvidia-smi`. The NVIDIA driver and
 `nvidia-smi` must be installed and available on `PATH`.
+
+## Enrollment
+
+Enroll a native host or Docker container using the same command and code path:
+
+```sh
+export VUN_ENROLLMENT_TOKEN="your-enrollment-token"
+./bin/vun enroll --config configs/agent.yaml
+```
+
+An explicit token overrides the environment variable:
+
+```sh
+./bin/vun enroll --token "your-enrollment-token" --config configs/agent.yaml
+```
+
+Configure the VUN API with `api_url` in the agent configuration. The example
+configuration points to `http://localhost:8085`. The enrollment request is
+sent to `POST /enrollment/host` with the token, agent version, and
+host inventory. On success, the returned host ID and agent credential are
+stored in the path from `VUN_STATE_PATH`; otherwise they default to the
+user's VUN configuration directory with restrictive file permissions.

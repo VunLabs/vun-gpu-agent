@@ -12,6 +12,7 @@ import (
 type Config struct {
 	ListenAddress string
 	LogLevel      string
+	APIURL        string
 }
 
 // Load reads a simple key/value YAML configuration file.
@@ -28,6 +29,7 @@ func Load(path string) (Config, error) {
 	cfg := Config{
 		ListenAddress: ":8080",
 		LogLevel:      "info",
+		APIURL:        "http://localhost:8085",
 	}
 
 	scanner := bufio.NewScanner(file)
@@ -54,6 +56,11 @@ func Load(path string) (Config, error) {
 				return Config{}, errors.New("log_level cannot be empty")
 			}
 			cfg.LogLevel = value
+		case "api_url":
+			if value == "" {
+				return Config{}, errors.New("api_url cannot be empty")
+			}
+			cfg.APIURL = strings.TrimRight(value, "/")
 		default:
 			return Config{}, fmt.Errorf("unknown config key %q", strings.TrimSpace(key))
 		}
