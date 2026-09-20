@@ -6,14 +6,48 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/SunilkumarT56/vun-gpu-agent/internal/cli"
 	"github.com/SunilkumarT56/vun-gpu-agent/internal/config"
 	"github.com/SunilkumarT56/vun-gpu-agent/internal/gpu"
 	"github.com/SunilkumarT56/vun-gpu-agent/internal/logger"
+	"github.com/SunilkumarT56/vun-gpu-agent/internal/version"
 )
 
 func main() {
-	configPath := flag.String("config", "configs/agent.yaml", "path to the agent configuration file")
-	flag.Parse()
+	if len(os.Args) > 1 && os.Args[1] == "version" {
+		printVersion()
+		return
+	}
+	if len(os.Args) > 1 && (os.Args[1] == "help" || os.Args[1] == "--help" || os.Args[1] == "-h") {
+		printHelp()
+		return
+	}
+	if len(os.Args) == 1 {
+		if err := cli.RunREPL(context.Background(), os.Stdin, os.Stdout); err != nil {
+			os.Exit(1)
+		}
+		return
+	}
+
+	switch os.Args[1] {
+	case "start":
+		start(os.Args[2:])
+	case "inventory", "discover":
+		inventory(os.Args[2:])
+	default:
+		fmt.Fprintf(os.Stderr, "vun: unknown command %q\n\n", os.Args[1])
+		printHelp()
+		os.Exit(2)
+	}
+}
+
+func start(args []string) {
+	startFlags := flag.NewFlagSet("start", flag.ContinueOnError)
+	startFlags.SetOutput(os.Stderr)
+	configPath := startFlags.String("config", "configs/agent.yaml", "path to the agent configuration file")
+	if err := startFlags.Parse(args); err != nil {
+		os.Exit(2)
+	}
 
 	log := logger.New()
 	cfg, err := config.Load(*configPath)
@@ -22,62 +56,68 @@ func main() {
 		os.Exit(1)
 	}
 
-	inventory, err := gpu.DiscoverHostInventory(context.Background())
+	inventory, err := discoverInventory(context.Background())
 	if err != nil {
 		log.Error("failed to discover host inventory", "error", err)
 		os.Exit(1)
 	}
-	printInventory(inventory)
-	for _, device := range inventory.GPUs {
-		printGPU(device)
-	}
-	fmt.Printf("\nAgent started\n  Listen address: %s\n", cfg.ListenAddress)
+	cli.PrintInventory(os.Stdout, inventory)
+	log.Info("gpu agent started", "listen_address", cfg.ListenAddress)
 }
 
-func printInventory(inventory gpu.HostInventory) {
-	fmt.Println("Host Inventory")
-	fmt.Println("==============")
-	fmt.Printf("  Hostname:     %s\n", inventory.Hostname)
-	fmt.Printf("  OS:           %s\n", inventory.OS)
-	fmt.Printf("  Architecture: %s\n", inventory.Architecture)
+func inventory(args []string) {
+	inventoryFlags := flag.NewFlagSet("inventory", flag.ContinueOnError)
+	inventoryFlags.SetOutput(os.Stderr)
+	jsonOutput := inventoryFlags.Bool("json", false, "print JSON output")
+	mockOutput := inventoryFlags.Bool("mock", false, "use simulated GPUs")
+	if err := inventoryFlags.Parse(args); err != nil {
+		os.Exit(2)
+	}
 
-	fmt.Println("\nCPU")
-	fmt.Println("---")
-	fmt.Printf("  Model:        %s\n", inventory.CPU.Model)
-	fmt.Printf("  Cores:        %d\n", inventory.CPU.Cores)
-	fmt.Printf("  Threads:      %d\n", inventory.CPU.Threads)
-	fmt.Printf("  Architecture: %s\n", inventory.CPU.Architecture)
-
-	fmt.Println("\nMemory")
-	fmt.Println("------")
-	fmt.Printf("  Total:        %d MB\n", inventory.Memory.TotalMB)
-	fmt.Printf("  Used:         %d MB\n", inventory.Memory.UsedMB)
-	fmt.Printf("  Free:         %d MB\n", inventory.Memory.FreeMB)
-
-	fmt.Println("\nStorage")
-	fmt.Println("-------")
-	fmt.Printf("  Total:        %d GB\n", inventory.Storage.TotalGB)
-	fmt.Printf("  Used:         %d GB\n", inventory.Storage.UsedGB)
-	fmt.Printf("  Free:         %d GB\n", inventory.Storage.FreeGB)
-	fmt.Println("\nNVIDIA GPUs")
-	fmt.Println("-----------")
-	if len(inventory.GPUs) > 0 {
-		fmt.Printf("  Found:        %d\n", len(inventory.GPUs))
+	var inventoryData gpu.HostInventory
+	var err error
+	if *mockOutput {
+		inventoryData, err = gpu.DiscoverHostInventoryWith(context.Background(), gpu.NewMockGPUDiscoverer())
 	} else {
-		fmt.Println("  None found")
+		inventoryData, err = gpu.DiscoverHostInventory(context.Background())
 	}
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "vun: inventory discovery failed: %v\n", err)
+		os.Exit(1)
+	}
+	if *jsonOutput {
+		if err := cli.PrintInventoryJSON(os.Stdout, inventoryData); err != nil {
+			fmt.Fprintf(os.Stderr, "vun: encode inventory: %v\n", err)
+			os.Exit(1)
+		}
+		return
+	}
+	cli.PrintInventory(os.Stdout, inventoryData)
 }
 
-func printGPU(device gpu.Device) {
-	fmt.Printf("\nNVIDIA GPU %d\n", device.Index)
-	fmt.Println("------------")
-	fmt.Printf("  Name:         %s\n", device.Name)
-	fmt.Printf("  UUID:         %s\n", device.UUID)
-	fmt.Printf("  Memory:       %d MB total, %d MB used, %d MB free\n",
-		device.MemoryTotalMB, device.MemoryUsedMB, device.MemoryFreeMB)
-	fmt.Printf("  Utilization:  %d%%\n", device.UtilizationPct)
-	fmt.Printf("  Temperature:  %d C\n", device.TemperatureC)
-	fmt.Printf("  Power:        %.2f W / %.2f W\n", device.PowerDrawW, device.PowerLimitW)
-	fmt.Printf("  Driver:       %s\n", device.DriverVersion)
-	fmt.Printf("  PCI bus:      %s\n", device.PCIBusID)
+func printHelp() {
+	fmt.Println("vun - GPU agent CLI")
+	fmt.Println()
+	fmt.Println("Usage:")
+	fmt.Println("  vun <command> [options]")
+	fmt.Println()
+	fmt.Println("Commands:")
+	fmt.Println("  start      Start the agent and print host inventory")
+	fmt.Println("  inventory  Discover and print host inventory")
+	fmt.Println("             Use --mock for simulated GPUs or --json for JSON output")
+	fmt.Println("  version    Show the VUN version")
+	fmt.Println("  help       Show this help message")
+	fmt.Println()
+	fmt.Println("Options for start:")
+	fmt.Println("  --config   Path to the agent configuration file")
+	fmt.Println()
+	fmt.Println("Run vun without arguments to open the interactive shell.")
+}
+
+func printVersion() {
+	fmt.Printf("vun version %s\n", version.Value)
+}
+
+func discoverInventory(ctx context.Context) (gpu.HostInventory, error) {
+	return gpu.DiscoverHostInventory(ctx)
 }

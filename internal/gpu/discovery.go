@@ -17,18 +17,18 @@ const query = "index,uuid,name,memory.total,memory.used,memory.free,utilization.
 
 // Device describes a GPU reported by nvidia-smi.
 type Device struct {
-	Index          int
-	UUID           string
-	Name           string
-	MemoryTotalMB  uint64
-	MemoryUsedMB   uint64
-	MemoryFreeMB   uint64
-	UtilizationPct uint64
-	TemperatureC   uint64
-	PowerDrawW     float64
-	PowerLimitW    float64
-	DriverVersion  string
-	PCIBusID       string
+	Index          int     `json:"index"`
+	UUID           string  `json:"uuid"`
+	Name           string  `json:"name"`
+	MemoryTotalMB  uint64  `json:"memoryTotalMB"`
+	MemoryUsedMB   uint64  `json:"memoryUsedMB"`
+	MemoryFreeMB   uint64  `json:"memoryFreeMB"`
+	UtilizationPct uint64  `json:"utilizationPct"`
+	TemperatureC   uint64  `json:"temperatureC"`
+	PowerDrawW     float64 `json:"powerDrawW"`
+	PowerLimitW    float64 `json:"powerLimitW"`
+	DriverVersion  string  `json:"driverVersion"`
+	PCIBusID       string  `json:"pciBusID"`
 }
 
 // Discover executes nvidia-smi and returns the installed NVIDIA GPUs.

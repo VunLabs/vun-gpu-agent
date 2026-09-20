@@ -15,41 +15,57 @@ import (
 
 // HostInventory describes the compute resources available on the host.
 type HostInventory struct {
-	Hostname     string
-	OS           string
-	Architecture string
+	Hostname     string `json:"hostname"`
+	OS           string `json:"os"`
+	Architecture string `json:"architecture"`
 
-	CPU     CPUInfo
-	Memory  MemoryInfo
-	Storage StorageInfo
+	CPU     CPUInfo     `json:"cpu"`
+	Memory  MemoryInfo  `json:"memory"`
+	Storage StorageInfo `json:"storage"`
 
-	GPUs []Device
+	GPUs []Device `json:"gpus"`
 }
 
 // CPUInfo describes the host CPU.
 type CPUInfo struct {
-	Model        string
-	Cores        int
-	Threads      int
-	Architecture string
+	Model        string `json:"model"`
+	Cores        int    `json:"cores"`
+	Threads      int    `json:"threads"`
+	Architecture string `json:"architecture"`
 }
 
 // MemoryInfo describes host memory in megabytes.
 type MemoryInfo struct {
-	TotalMB uint64
-	UsedMB  uint64
-	FreeMB  uint64
+	TotalMB uint64 `json:"totalMB"`
+	UsedMB  uint64 `json:"usedMB"`
+	FreeMB  uint64 `json:"freeMB"`
 }
 
 // StorageInfo describes the storage available on the host root volume.
 type StorageInfo struct {
-	TotalGB uint64
-	UsedGB  uint64
-	FreeGB  uint64
+	TotalGB uint64 `json:"totalGB"`
+	UsedGB  uint64 `json:"usedGB"`
+	FreeGB  uint64 `json:"freeGB"`
+}
+
+// Discoverer provides GPU discovery for host inventory collection.
+type Discoverer interface {
+	Discover(context.Context) ([]Device, error)
+}
+
+type nvidiaSMIDiscoverer struct{}
+
+func (nvidiaSMIDiscoverer) Discover(ctx context.Context) ([]Device, error) {
+	return Discover(ctx)
 }
 
 // DiscoverHostInventory collects host metadata and NVIDIA GPU information.
 func DiscoverHostInventory(ctx context.Context) (HostInventory, error) {
+	return DiscoverHostInventoryWith(ctx, nvidiaSMIDiscoverer{})
+}
+
+// DiscoverHostInventoryWith collects host metadata using the supplied GPU discoverer.
+func DiscoverHostInventoryWith(ctx context.Context, discoverer Discoverer) (HostInventory, error) {
 	hostname, err := os.Hostname()
 	if err != nil {
 		return HostInventory{}, fmt.Errorf("get hostname: %w", err)
@@ -70,7 +86,7 @@ func DiscoverHostInventory(ctx context.Context) (HostInventory, error) {
 		return HostInventory{}, fmt.Errorf("discover storage: %w", err)
 	}
 
-	gpus, err := Discover(ctx)
+	gpus, err := discoverer.Discover(ctx)
 	if err != nil {
 		return HostInventory{}, fmt.Errorf("discover GPUs: %w", err)
 	}
