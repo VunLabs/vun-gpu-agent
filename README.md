@@ -114,3 +114,14 @@ sent to `POST /enrollment/host` with the token, agent version, and
 host inventory. On success, the returned host ID and agent credential are
 stored in the path from `VUN_STATE_PATH`; otherwise they default to the
 user's VUN configuration directory with restrictive file permissions.
+
+When running the container without a mounted configuration file, `vun enroll`
+uses the built-in API default. Set `VUN_API_URL` when the backend is not
+reachable at the default URL, for example:
+
+```sh
+docker run --rm -it \
+  -e VUN_ENROLLMENT_TOKEN="your-token" \
+  -e VUN_API_URL="http://host.docker.internal:8085" \
+  ghcr.io/vunlabs/vun-gpu-agent:latest
+```

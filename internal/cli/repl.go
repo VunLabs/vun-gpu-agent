@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -160,9 +161,23 @@ func Enroll(ctx context.Context, out io.Writer, args []string) error {
 	if strings.TrimSpace(token) == "" {
 		return fmt.Errorf("enrollment token is required; set VUN_ENROLLMENT_TOKEN or use --token")
 	}
-	cfg, err := config.Load(configPath)
-	if err != nil {
-		return err
+	var cfg config.Config
+	var err error
+	if configPath == "configs/agent.yaml" {
+		cfg, err = config.Load(configPath)
+		if errors.Is(err, os.ErrNotExist) {
+			cfg = config.Defaults()
+		} else if err != nil {
+			return err
+		}
+	} else {
+		cfg, err = config.Load(configPath)
+		if err != nil {
+			return err
+		}
+	}
+	if apiURL := strings.TrimSpace(os.Getenv("VUN_API_URL")); apiURL != "" {
+		cfg.APIURL = strings.TrimRight(apiURL, "/")
 	}
 	inventory, err := gpu.DiscoverHostInventory(ctx)
 	if err != nil {

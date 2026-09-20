@@ -15,6 +15,16 @@ type Config struct {
 	APIURL        string
 }
 
+// Defaults returns configuration suitable for running with environment-only
+// settings, including in a container without a mounted config file.
+func Defaults() Config {
+	return Config{
+		ListenAddress: ":8085",
+		LogLevel:      "info",
+		APIURL:        "http://localhost:8085",
+	}
+}
+
 // Load reads a simple key/value YAML configuration file.
 //
 // The agent configuration intentionally supports only the scalar settings
@@ -26,11 +36,7 @@ func Load(path string) (Config, error) {
 	}
 	defer file.Close()
 
-	cfg := Config{
-		ListenAddress: ":8080",
-		LogLevel:      "info",
-		APIURL:        "http://localhost:8085",
-	}
+	cfg := Defaults()
 
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
