@@ -6,9 +6,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/SunilkumarT56/vun-gpu-agent/internal/gpu"
 	"net/http"
 	"strings"
-	"github.com/SunilkumarT56/vun-gpu-agent/internal/gpu"
 )
 
 type Client struct {
@@ -23,8 +23,9 @@ type Request struct {
 }
 
 type Result struct {
-	HostID          string `json:"hostId"`
-	AgentCredential string `json:"agentCredential"`
+	HostID     string `json:"hostId"`
+	Status     string `json:"status"`
+	Credential string `json:"credential"`
 }
 
 func (c Client) Enroll(ctx context.Context, token, agentVersion string, inventory gpu.HostInventory) (Result, error) {
@@ -35,7 +36,8 @@ func (c Client) Enroll(ctx context.Context, token, agentVersion string, inventor
 		return Result{}, errors.New("VUN API URL is not configured")
 	}
 
-	body, err := json.Marshal(Request{EnrollmentToken: token, AgentVersion: agentVersion, Inventory: inventory})
+	payload := Request{EnrollmentToken: token, AgentVersion: agentVersion, Inventory: inventory}
+	body, err := json.Marshal(payload)
 	if err != nil {
 		return Result{}, fmt.Errorf("encode enrollment request: %w", err)
 	}
@@ -48,6 +50,9 @@ func (c Client) Enroll(ctx context.Context, token, agentVersion string, inventor
 	if client == nil {
 		client = http.DefaultClient
 	}
+	fmt.Printf("Enrollment URL: %s\n", req.URL.String())
+	fmt.Printf("Enrollment token: %q\n", token)
+	fmt.Printf("Request body: %+v\n", payload)
 	resp, err := client.Do(req)
 	if err != nil {
 		return Result{}, fmt.Errorf("send enrollment request: %w", err)
@@ -67,8 +72,8 @@ func (c Client) Enroll(ctx context.Context, token, agentVersion string, inventor
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return Result{}, fmt.Errorf("decode enrollment response: %w", err)
 	}
-	if result.HostID == "" || result.AgentCredential == "" {
-		return Result{}, errors.New("enrollment response missing hostId or agentCredential")
+	if result.HostID == "" || result.Credential == "" {
+		return Result{}, errors.New("enrollment response missing hostId or credential")
 	}
 	return result, nil
 }

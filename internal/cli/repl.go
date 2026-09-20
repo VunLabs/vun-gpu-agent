@@ -187,10 +187,13 @@ func Enroll(ctx context.Context, out io.Writer, args []string) error {
 	if err != nil {
 		return err
 	}
-	if err := state.SaveEnrollment(state.Enrollment{HostID: result.HostID, AgentCredential: result.AgentCredential}); err != nil {
+	if err := state.SaveEnrollment(state.Enrollment{HostID: result.HostID, AgentCredential: result.Credential}); err != nil {
 		return err
 	}
 	fmt.Fprintf(out, "Enrollment successful\n  Host ID: %s\n", result.HostID)
+	if result.Status != "" {
+		fmt.Fprintf(out, "  Status: %s\n", result.Status)
+	}
 	fmt.Fprintln(out, "  Agent credential saved locally.")
 	return nil
 }

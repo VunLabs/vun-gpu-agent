@@ -111,8 +111,8 @@ An explicit token overrides the environment variable:
 Configure the VUN API with `api_url` in the agent configuration. The example
 configuration points to `http://localhost:8085`. The enrollment request is
 sent to `POST /enrollment/host` with the token, agent version, and
-host inventory. On success, the returned host ID and agent credential are
-stored in the path from `VUN_STATE_PATH`; otherwise they default to the
+host inventory. On success, the returned `hostId`, `status`, and `credential`
+are processed; the host ID and credential are stored in the path from `VUN_STATE_PATH`; otherwise they default to the
 user's VUN configuration directory with restrictive file permissions.
 
 When running the container without a mounted configuration file, `vun enroll`
